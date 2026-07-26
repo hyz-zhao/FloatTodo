@@ -1,7 +1,7 @@
 <script setup lang="ts">
-// 日期范围选择器：快捷预设 + 自定义起始/结束
+// 日期范围选择器：编辑感排版，衬线大数字 + 细描边 chip
 import { computed, ref, watch } from "vue";
-import { describeRange, fmtDate, humanDate, rangeForPreset } from "../date";
+import { describeRange, fmtDate, parseDate, rangeForPreset } from "../date";
 import type { RangePreset } from "../types";
 
 const props = defineProps<{
@@ -12,7 +12,6 @@ const emit = defineEmits<{
   (e: "update", start: string, end: string): void;
 }>();
 
-// 反推当前是否匹配某个预设
 function detectPreset(s: string, e: string): RangePreset {
   for (const p of ["today", "tomorrow", "this-week", "next-week"] as const) {
     const r = rangeForPreset(p);
@@ -45,7 +44,6 @@ function applyPreset(p: RangePreset) {
 function onCustomStart(v: string) {
   customStart.value = v;
   preset.value = "custom";
-  // 起始 > 结束则自动调整结束
   let end = customEnd.value;
   if (end < customStart.value) end = customStart.value;
   customEnd.value = end;
@@ -61,7 +59,13 @@ function onCustomEnd(v: string) {
   emit("update", start, customEnd.value);
 }
 
-const rangeLabel = computed(() => describeRange(props.start, props.end));
+const startObj = computed(() => parseDate(props.start));
+const endObj = computed(() => parseDate(props.end));
+const sameDay = computed(() => props.start === props.end);
+const daySpan = computed(() => {
+  const ms = endObj.value.getTime() - startObj.value.getTime();
+  return Math.round(ms / 86400000) + 1;
+});
 
 const presets: { key: RangePreset; label: string }[] = [
   { key: "today", label: "今天" },
@@ -73,6 +77,28 @@ const presets: { key: RangePreset; label: string }[] = [
 
 <template>
   <div class="date-picker">
+    <!-- 大数字日期头（编辑感） -->
+    <div class="date-head">
+      <div class="date-num">
+        <span class="num">{{ startObj.getDate() }}</span>
+        <div class="meta">
+          <span class="month">{{ startObj.getMonth() + 1 }}月</span>
+          <span class="year">{{ startObj.getFullYear() }}</span>
+        </div>
+      </div>
+      <div v-if="!sameDay" class="date-arrow">
+        <span class="dash"></span>
+        <span class="span">共 {{ daySpan }} 天</span>
+      </div>
+      <div v-if="!sameDay" class="date-num small">
+        <span class="num">{{ endObj.getDate() }}</span>
+        <div class="meta">
+          <span class="month">{{ endObj.getMonth() + 1 }}月</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 快捷选项 -->
     <div class="presets">
       <button
         v-for="p in presets"
@@ -84,83 +110,182 @@ const presets: { key: RangePreset; label: string }[] = [
         {{ p.label }}
       </button>
     </div>
+
+    <!-- 自定义日期 -->
     <div class="custom">
       <label class="field">
-        <span>从</span>
-        <input type="date" :value="customStart" @input="(e) => onCustomStart((e.target as HTMLInputElement).value)" />
+        <span class="label">起</span>
+        <input
+          type="date"
+          :value="customStart"
+          @input="(e) => onCustomStart((e.target as HTMLInputElement).value)"
+        />
       </label>
+      <span class="divider">—</span>
       <label class="field">
-        <span>至</span>
-        <input type="date" :value="customEnd" @input="(e) => onCustomEnd((e.target as HTMLInputElement).value)" />
+        <span class="label">止</span>
+        <input
+          type="date"
+          :value="customEnd"
+          @input="(e) => onCustomEnd((e.target as HTMLInputElement).value)"
+        />
       </label>
     </div>
-    <div class="hint">{{ rangeLabel }}</div>
   </div>
 </template>
 
 <style scoped>
 .date-picker {
-  padding: 10px 12px 8px;
-  border-bottom: 1px solid var(--c-border);
-  background: var(--c-bg-soft);
+  padding: 18px 18px 14px;
+  border-bottom: 1px solid var(--c-line);
+  background: var(--c-paper);
+  position: relative;
 }
 
+.date-picker::after {
+  content: "";
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: -1px;
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    transparent,
+    var(--c-line) 20%,
+    var(--c-line) 80%,
+    transparent
+  );
+}
+
+/* —— 大数字日期 —— */
+.date-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.date-num {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.date-num.small .num {
+  font-size: 24px;
+}
+.num {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 36px;
+  color: var(--c-ink);
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-feature-settings: "lnum", "tnum";
+}
+.meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.month {
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--c-ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.year {
+  font-family: var(--font-body);
+  font-size: 9px;
+  color: var(--c-ink-dim);
+  letter-spacing: 0.1em;
+}
+
+.date-arrow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  color: var(--c-ink-dim);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.dash {
+  flex: 1;
+  height: 1px;
+  background: var(--c-line);
+}
+.span {
+  white-space: nowrap;
+}
+
+/* —— 预设 chip —— */
 .presets {
   display: flex;
   gap: 6px;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
-
 .preset {
   flex: 1;
-  padding: 5px 0;
-  font-size: 12px;
+  padding: 6px 0;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
   border-radius: var(--r-pill);
-  background: #fff;
-  color: var(--c-text-soft);
-  border: 1px solid var(--c-border);
-  transition: all 0.15s ease;
+  background: transparent;
+  color: var(--c-ink-soft);
+  border: 1px solid var(--c-line-2);
+  transition: all 0.2s var(--ease-out);
 }
 .preset:hover {
-  color: var(--c-primary);
-  border-color: var(--c-primary);
+  color: var(--c-ink);
+  border-color: var(--c-ink);
 }
 .preset.active {
-  background: var(--c-primary);
-  color: #fff;
-  border-color: var(--c-primary);
+  background: var(--c-ink);
+  color: var(--c-paper);
+  border-color: var(--c-ink);
 }
 
+/* —— 自定义日期 —— */
 .custom {
   display: flex;
+  align-items: center;
   gap: 8px;
 }
-
 .field {
   flex: 1;
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
-  color: var(--c-text-soft);
 }
-
+.label {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 12px;
+  color: var(--c-ink-dim);
+  width: 14px;
+}
 .field input {
   flex: 1;
   padding: 4px 6px;
   font-size: 12px;
-  border: 1px solid var(--c-border);
-  border-radius: var(--r-sm);
-  background: #fff;
-  color: var(--c-text);
+  font-family: var(--font-mono);
+  border: none;
+  border-bottom: 1px dashed var(--c-line-2);
+  color: var(--c-ink);
+  background: transparent;
+  letter-spacing: 0.02em;
 }
 .field input:focus {
-  border-color: var(--c-primary);
+  border-bottom-color: var(--c-accent);
+  border-bottom-style: solid;
 }
-
-.hint {
-  margin-top: 6px;
+.divider {
+  color: var(--c-ink-dim);
   font-size: 11px;
-  color: var(--c-text-dim);
 }
 </style>

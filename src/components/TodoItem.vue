@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 单条待办：复选框 + 文本（勾选后画删除线）+ 悬停出现删除按钮
+// 单条待办：圆形复选框 + SVG 笔触勾选动画，编辑感删除线
 import { ref } from "vue";
 import type { Todo } from "../types";
 
@@ -15,7 +15,6 @@ const draft = ref(props.todo.text);
 const inputRef = ref<HTMLInputElement | null>(null);
 
 function startEdit() {
-  // 已完成的不允许再次编辑（保持简洁）
   if (props.todo.completed) return;
   draft.value = props.todo.text;
   editing.value = true;
@@ -25,7 +24,6 @@ function startEdit() {
 function commit() {
   const v = draft.value.trim();
   if (!v) {
-    // 空内容视为删除
     emit("remove", props.todo);
     return;
   }
@@ -48,6 +46,7 @@ function onToggle(e: Event) {
 
 <template>
   <li class="todo-item" :class="{ done: todo.completed }">
+    <!-- 复选框（带 SVG 笔触动画） -->
     <label class="check">
       <input
         type="checkbox"
@@ -55,18 +54,20 @@ function onToggle(e: Event) {
         @change="onToggle"
       />
       <span class="box" aria-hidden="true">
-        <svg v-if="todo.completed" viewBox="0 0 16 16" width="10" height="10">
+        <svg viewBox="0 0 16 16" width="11" height="11" class="tick">
           <path
+            class="tick-path"
             d="M3 8.5l3 3 7-7"
             fill="none"
-            stroke="white"
-            stroke-width="2"
+            stroke="currentColor"
+            stroke-width="1.8"
             stroke-linecap="round"
             stroke-linejoin="round"
           />
         </svg>
       </span>
     </label>
+
     <div class="text-wrap" @dblclick="startEdit">
       <input
         v-if="editing"
@@ -79,13 +80,21 @@ function onToggle(e: Event) {
       />
       <span v-else class="text">{{ todo.text }}</span>
     </div>
+
     <button
       v-if="!editing"
       class="remove"
       title="删除"
       @click="emit('remove', todo)"
     >
-      ×
+      <svg viewBox="0 0 16 16" width="10" height="10" aria-hidden="true">
+        <path
+          d="M3 3l10 10M13 3L3 13"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linecap="round"
+        />
+      </svg>
     </button>
   </li>
 </template>
@@ -94,23 +103,53 @@ function onToggle(e: Event) {
 .todo-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  border-radius: var(--r-sm);
-  transition: background 0.15s ease;
+  gap: 12px;
+  padding: 10px 14px;
   position: relative;
-}
-.todo-item:hover {
-  background: var(--c-bg-soft);
+  transition: background 0.2s var(--ease-out);
+  animation: itemIn 0.4s var(--ease-out) backwards;
 }
 
+/* 列表项错落淡入 */
+@keyframes itemIn {
+  from {
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* 行间分隔：上下细线 */
+.todo-item::before,
+.todo-item::after {
+  content: "";
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  height: 1px;
+  background: var(--c-line);
+}
+.todo-item::before {
+  top: 0;
+}
+.todo-item::after {
+  bottom: 0;
+}
+.todo-item:last-child::after {
+  display: none;
+}
+
+/* —— 复选框 —— */
 .check {
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   flex-shrink: 0;
   cursor: pointer;
 }
@@ -123,43 +162,62 @@ function onToggle(e: Event) {
   cursor: pointer;
 }
 .box {
-  width: 18px;
-  height: 18px;
-  border: 1.5px solid #c8d0d8;
-  border-radius: 4px;
-  background: #fff;
+  width: 20px;
+  height: 20px;
+  border: 1.25px solid var(--c-ink-soft);
+  border-radius: 50%;
+  background: transparent;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.15s ease;
+  color: var(--c-paper);
+  transition: all 0.25s var(--ease-out);
 }
 .check:hover .box {
-  border-color: var(--c-primary);
+  border-color: var(--c-ink);
+  transform: scale(1.06);
 }
 .check input:checked + .box {
-  background: var(--c-primary);
-  border-color: var(--c-primary);
+  background: var(--c-accent);
+  border-color: var(--c-accent);
 }
 
+/* 勾选时笔触动画 */
+.tick {
+  overflow: visible;
+}
+.tick-path {
+  stroke-dasharray: 18;
+  stroke-dashoffset: 18;
+  transition: stroke-dashoffset 0.32s var(--ease-out) 0.05s;
+}
+.check input:checked + .box .tick-path {
+  stroke-dashoffset: 0;
+}
+
+/* —— 文字 —— */
 .text-wrap {
   flex: 1;
   min-width: 0;
   display: flex;
   align-items: center;
 }
-
 .text {
   font-size: 14px;
-  color: var(--c-text);
-  line-height: 1.4;
+  color: var(--c-ink);
+  line-height: 1.45;
   word-break: break-word;
-  transition: color 0.15s ease, text-decoration-color 0.2s ease;
+  transition: color 0.3s ease;
+  letter-spacing: 0.01em;
 }
 
 .todo-item.done .text {
-  color: var(--c-text-dim);
+  color: var(--c-ink-dim);
+  /* 双重删除线 + 自定义偏移，模拟手绘感 */
   text-decoration: line-through;
-  text-decoration-color: var(--c-text-dim);
+  text-decoration-color: var(--c-accent);
+  text-decoration-thickness: 1.2px;
+  text-underline-offset: 2px;
 }
 
 .edit-input {
@@ -167,30 +225,33 @@ function onToggle(e: Event) {
   width: 100%;
   font-size: 14px;
   padding: 2px 4px;
-  border: 1px solid var(--c-primary);
-  border-radius: 4px;
-  background: #fff;
+  border: none;
+  border-bottom: 1.5px solid var(--c-accent);
+  color: var(--c-ink);
+  background: transparent;
+  outline: none;
 }
 
+/* —— 删除按钮 —— */
 .remove {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
-  color: var(--c-text-dim);
-  font-size: 18px;
-  line-height: 1;
+  color: var(--c-ink-dim);
   display: flex;
   align-items: center;
   justify-content: center;
   opacity: 0;
-  transition: all 0.15s ease;
+  transition: all 0.2s var(--ease-out);
   flex-shrink: 0;
+  transform: scale(0.9);
 }
 .todo-item:hover .remove {
   opacity: 1;
+  transform: scale(1);
 }
 .remove:hover {
-  background: var(--c-danger);
-  color: #fff;
+  background: var(--c-ink);
+  color: var(--c-paper);
 }
 </style>

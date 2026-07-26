@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 主面板：标题栏（可拖动）+ 日期范围 + 列表 + 新增输入
+// 主面板：编辑感杂志排版，衬线品牌 + 元信息 + 日期 + 列表 + 输入
 import { computed, onMounted, ref, watch } from "vue";
 import {
   apiAddTodo,
@@ -23,6 +23,7 @@ const todos = ref<Todo[]>([]);
 const draft = ref("");
 const listEl = ref<HTMLDivElement | null>(null);
 const hasAnyCompleted = computed(() => todos.value.some((t) => t.completed));
+const pendingCount = computed(() => todos.value.filter((t) => !t.completed).length);
 
 async function loadConfig() {
   const cfg = await apiGetConfig();
@@ -39,7 +40,6 @@ async function loadConfig() {
 async function reload() {
   if (!start.value || !end.value) return;
   todos.value = await apiListTodos(start.value, end.value);
-  // 记忆当前选择
   const cfg = await apiGetConfig();
   await apiSaveWindowConfig({
     ...cfg,
@@ -91,7 +91,6 @@ async function onClearCompleted() {
 }
 
 async function onCollapse() {
-  // 主面板大小 / 位置记到配置
   try {
     const { getCurrentWindow } = await import("@tauri-apps/api/window");
     const win = getCurrentWindow();
@@ -118,15 +117,40 @@ async function onQuit() {
   }
 }
 
+const now = ref(new Date());
 onMounted(async () => {
   await loadConfig();
   await reload();
+  // 每分钟更新一次时间显示（编辑感元信息）
+  setInterval(() => {
+    now.value = new Date();
+  }, 60_000);
+});
+
+const issueNo = computed(() => {
+  // 用 ISO 周数生成「期号」
+  const d = now.value;
+  const target = new Date(d.valueOf());
+  const dayNr = (d.getDay() + 6) % 7;
+  target.setDate(target.getDate() - dayNr + 3);
+  const firstThursday = target.valueOf();
+  target.setMonth(0, 1);
+  if (target.getDay() !== 4) {
+    target.setMonth(0, 1 + ((4 - target.getDay()) + 7) % 7);
+  }
+  const week = 1 + Math.ceil((firstThursday - target.valueOf()) / 604800000);
+  return `Nº ${String(week).padStart(2, "0")}`;
+});
+
+const dateStr = computed(() => {
+  const d = now.value;
+  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
 });
 </script>
 
 <template>
   <div class="panel">
-    <!-- 标题栏：可拖动（通过 Tauri startDragging） -->
+    <!-- 标题栏 -->
     <header
       class="titlebar"
       @mousedown="async (e) => {
@@ -135,24 +159,55 @@ onMounted(async () => {
         getCurrentWindow().startDragging().catch(() => {});
       }"
     >
-      <div class="title">FloatTodo · 待办</div>
+      <div class="brand">
+        <span class="logo">F</span>
+        <span class="name">FloatTodo</span>
+        <span class="tag">·</span>
+        <span class="meta-issue">{{ issueNo }}</span>
+      </div>
       <div class="actions">
-        <button class="icon-btn" title="收起为悬浮球" @click="onCollapse">—</button>
-        <button class="icon-btn danger" title="退出" @click="onQuit">×</button>
+        <button class="icon-btn" title="收起为悬浮球" @click="onCollapse">
+          <svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true">
+            <path d="M3 9h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+          </svg>
+        </button>
+        <button class="icon-btn danger" title="退出" @click="onQuit">
+          <svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true">
+            <path
+              d="M4 4l8 8M12 4l-8 8"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+            />
+          </svg>
+        </button>
       </div>
     </header>
 
+    <!-- 元信息条（编辑感：期号 · 日期 · 计数） -->
+    <div class="meta-bar">
+      <span class="meta-item">{{ dateStr }}</span>
+      <span class="meta-sep">·</span>
+      <span class="meta-item count">
+        <em>{{ pendingCount }}</em> 项待办
+      </span>
+    </div>
+
     <DateRangePicker :start="start" :end="end" @update="onRangeChange" />
 
+    <!-- 列表 -->
     <div class="list" ref="listEl">
       <div v-if="todos.length === 0" class="empty">
-        还没有待办事项，在下方添加一个吧～
+        <div class="empty-mark">— § —</div>
+        <div class="empty-text">本日尚无安排</div>
+        <div class="empty-hint">在下方添加第一项</div>
       </div>
-      <ul v-else>
+      <ul v-else class="todo-list">
         <TodoItem
-          v-for="t in todos"
+          v-for="(t, i) in todos"
           :key="t.id"
           :todo="t"
+          :style="{ animationDelay: `${i * 40}ms` }"
           @toggle="onToggle"
           @edit="onEdit"
           @remove="onRemove"
@@ -160,18 +215,25 @@ onMounted(async () => {
       </ul>
     </div>
 
+    <!-- 工具条：清除已完成 -->
     <div class="toolbar" v-if="hasAnyCompleted">
-      <button class="clear-btn" @click="onClearCompleted">清除已完成</button>
+      <button class="clear-btn" @click="onClearCompleted">
+        <span>清除已完成</span>
+        <span class="arrow">→</span>
+      </button>
     </div>
 
+    <!-- 输入区 -->
     <footer class="composer">
+      <span class="composer-mark" aria-hidden="true">+</span>
       <input
         v-model="draft"
         class="composer-input"
-        placeholder="+ 添加一项待办（回车保存）"
+        placeholder="写下这一项……"
         @keydown.enter="onKeyEnter"
       />
-      <button class="add-btn" :disabled="!draft.trim()" @click="onAdd">+</button>
+      <span class="composer-hint" v-if="!draft">↵</span>
+      <span class="composer-hint" v-else>↵</span>
     </footer>
   </div>
 </template>
@@ -182,121 +244,237 @@ onMounted(async () => {
   inset: 0;
   display: flex;
   flex-direction: column;
-  background: var(--c-bg);
-  border-radius: var(--r-lg);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+  background: var(--c-paper);
+  border-radius: var(--r-xl);
+  box-shadow: var(--c-shadow);
   overflow: hidden;
+  border: 1px solid var(--c-line);
 }
 
+/* —— 标题栏 —— */
 .titlebar {
-  height: 36px;
+  height: 42px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 8px 0 14px;
-  background: var(--c-bg-soft);
-  border-bottom: 1px solid var(--c-border);
+  padding: 0 10px 0 16px;
+  background: var(--c-paper);
+  border-bottom: 1px solid var(--c-line);
   cursor: grab;
+  flex-shrink: 0;
 }
 .titlebar:active {
   cursor: grabbing;
 }
-.title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--c-text);
-}
-.actions {
+
+.brand {
   display: flex;
-  gap: 4px;
+  align-items: center;
+  gap: 8px;
 }
-.icon-btn {
+.logo {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 600;
+  font-size: 18px;
+  color: var(--c-paper);
+  background: var(--c-ink);
   width: 24px;
   height: 24px;
-  border-radius: 4px;
-  font-size: 14px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   line-height: 1;
-  color: var(--c-text-soft);
+  letter-spacing: -0.02em;
 }
-.icon-btn:hover {
-  background: rgba(0, 0, 0, 0.06);
-  color: var(--c-text);
+.name {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 16px;
+  color: var(--c-ink);
+  letter-spacing: -0.01em;
 }
-.icon-btn.danger:hover {
-  background: var(--c-danger);
-  color: #fff;
+.tag {
+  color: var(--c-ink-dim);
+  font-size: 10px;
+}
+.meta-issue {
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--c-ink-soft);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
+.actions {
+  display: flex;
+  gap: 2px;
+}
+.icon-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  color: var(--c-ink-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s var(--ease-out);
+}
+.icon-btn:hover {
+  background: var(--c-ink);
+  color: var(--c-paper);
+}
+.icon-btn.danger:hover {
+  background: var(--c-accent);
+}
+
+/* —— 元信息条 —— */
+.meta-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  background: var(--c-paper-2);
+  border-bottom: 1px solid var(--c-line);
+  font-size: 10px;
+  color: var(--c-ink-soft);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+.meta-sep {
+  color: var(--c-ink-dim);
+}
+.meta-item.count em {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--c-accent);
+  font-style: normal;
+  text-transform: none;
+  letter-spacing: 0;
+  margin-right: 2px;
+}
+
+/* —— 列表 —— */
 .list {
   flex: 1;
   overflow-y: auto;
-  padding: 6px 6px;
+  padding: 0;
+  position: relative;
 }
-.list ul {
+.todo-list {
   list-style: none;
+  margin: 0;
+  padding: 0;
 }
+
 .empty {
   text-align: center;
-  color: var(--c-text-dim);
-  font-size: 13px;
-  padding: 36px 12px;
-  line-height: 1.6;
+  padding: 56px 24px 32px;
+}
+.empty-mark {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 18px;
+  color: var(--c-ink-dim);
+  letter-spacing: 0.1em;
+  margin-bottom: 16px;
+}
+.empty-text {
+  font-family: var(--font-display);
+  font-size: 18px;
+  color: var(--c-ink-soft);
+  margin-bottom: 6px;
+  letter-spacing: 0.02em;
+}
+.empty-hint {
+  font-size: 11px;
+  color: var(--c-ink-dim);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
+/* —— 工具条 —— */
 .toolbar {
-  padding: 4px 12px 0;
+  padding: 0 18px;
   display: flex;
   justify-content: flex-end;
+  flex-shrink: 0;
 }
 .clear-btn {
-  font-size: 12px;
-  color: var(--c-text-soft);
-  padding: 3px 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--c-ink-soft);
+  padding: 4px 10px;
   border-radius: var(--r-pill);
-  background: var(--c-bg-soft);
+  background: transparent;
+  border: 1px solid var(--c-line-2);
+  transition: all 0.2s var(--ease-out);
+  letter-spacing: 0.04em;
+}
+.clear-btn .arrow {
+  transition: transform 0.2s var(--ease-out);
 }
 .clear-btn:hover {
-  color: var(--c-danger);
-  background: #fef2f2;
+  color: var(--c-accent);
+  border-color: var(--c-accent);
+}
+.clear-btn:hover .arrow {
+  transform: translateX(2px);
 }
 
+/* —— 输入区 —— */
 .composer {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 10px 12px 12px;
-  border-top: 1px solid var(--c-border);
-  background: var(--c-bg-soft);
+  gap: 10px;
+  padding: 12px 18px 16px;
+  background: var(--c-paper);
+  border-top: 1px solid var(--c-line);
+  flex-shrink: 0;
+}
+.composer-mark {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 400;
+  color: var(--c-ink-soft);
+  line-height: 1;
+  width: 22px;
+  text-align: center;
 }
 .composer-input {
   flex: 1;
   height: 32px;
-  padding: 0 10px;
-  font-size: 13px;
-  background: #fff;
-  border: 1px solid var(--c-border);
-  border-radius: var(--r-pill);
+  padding: 0;
+  font-size: 14px;
+  color: var(--c-ink);
+  background: transparent;
+  border: none;
+  border-bottom: 1.5px solid var(--c-line-2);
+  letter-spacing: 0.01em;
+  transition: border-color 0.2s ease;
 }
 .composer-input:focus {
-  border-color: var(--c-primary);
+  border-bottom-color: var(--c-ink);
 }
-.add-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--c-primary);
-  color: #fff;
-  font-size: 18px;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.composer-input::placeholder {
+  color: var(--c-ink-dim);
+  font-style: italic;
+  font-family: var(--font-display);
 }
-.add-btn:disabled {
-  background: #c8d6e5;
-  cursor: not-allowed;
-}
-.add-btn:not(:disabled):hover {
-  background: var(--c-primary-hover);
+.composer-hint {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 11px;
+  color: var(--c-ink-dim);
+  width: 18px;
+  text-align: center;
 }
 </style>
