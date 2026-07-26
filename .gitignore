@@ -29,6 +29,9 @@ Thumbs.db
 src-tauri/target
 src-tauri/gen/schemas
 
+# Claude
+.claude/
+
 # 项目脚本产物
 icon-source.png
 make-icon.ps1

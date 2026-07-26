@@ -1,27 +1,20 @@
 <script setup lang="ts">
-// 悬浮球：墨色底 + 朱砂光晕，长按拖动，单击展开
+// 悬浮球：墨色底 + 朱砂光晕，拖动移动，单击展开
 import { onBeforeUnmount, onMounted, ref } from "vue";
-import { apiCollapseToBall, apiExpandToPanel, apiSaveWindowConfig, apiGetConfig } from "../api";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { apiExpandToPanel, apiSaveWindowConfig, apiGetConfig } from "../api";
 
-const longPressTimer = ref<number | null>(null);
 const isDragging = ref(false);
 const dragMoved = ref(false);
 let startX = 0;
 let startY = 0;
-const ballRef = ref<HTMLDivElement | null>(null);
 
 function onMouseDown(e: MouseEvent) {
   if (e.button !== 0) return;
   startX = e.clientX;
   startY = e.clientY;
   dragMoved.value = false;
-  // 长按 350ms 进入拖动
-  longPressTimer.value = window.setTimeout(() => {
-    isDragging.value = true;
-    import("@tauri-apps/api/window").then(({ getCurrentWindow }) => {
-      getCurrentWindow().startDragging().catch(() => {});
-    });
-  }, 350);
+  isDragging.value = false;
   window.addEventListener("mousemove", onMouseMove);
   window.addEventListener("mouseup", onMouseUp, { once: true });
 }
@@ -30,9 +23,9 @@ function onMouseMove(e: MouseEvent) {
   const dx = Math.abs(e.clientX - startX);
   const dy = Math.abs(e.clientY - startY);
   if (dx > 5 || dy > 5) {
-    if (longPressTimer.value !== null) {
-      clearTimeout(longPressTimer.value);
-      longPressTimer.value = null;
+    if (!isDragging.value) {
+      isDragging.value = true;
+      getCurrentWindow().startDragging().catch(() => {});
     }
     dragMoved.value = true;
   }
@@ -40,10 +33,6 @@ function onMouseMove(e: MouseEvent) {
 
 async function onMouseUp(_e: MouseEvent) {
   window.removeEventListener("mousemove", onMouseMove);
-  if (longPressTimer.value !== null) {
-    clearTimeout(longPressTimer.value);
-    longPressTimer.value = null;
-  }
   // 没有拖动 = 单击
   if (!dragMoved.value && !isDragging.value) {
     await apiExpandToPanel();
@@ -52,7 +41,6 @@ async function onMouseUp(_e: MouseEvent) {
   if (isDragging.value) {
     isDragging.value = false;
     try {
-      const { getCurrentWindow } = await import("@tauri-apps/api/window");
       const pos = await getCurrentWindow().outerPosition();
       const scale = await getCurrentWindow().scaleFactor();
       const cfg = await apiGetConfig();
@@ -72,7 +60,6 @@ onMounted(() => {
 });
 onBeforeUnmount(() => {
   window.removeEventListener("contextmenu", preventContext);
-  if (longPressTimer.value !== null) clearTimeout(longPressTimer.value);
 });
 
 function preventContext(e: Event) {
@@ -86,11 +73,11 @@ function preventContext(e: Event) {
     :class="{ dragging: isDragging }"
     @mousedown="onMouseDown"
     @contextmenu.prevent
-    title="点击展开 · 长按拖动"
+    title="点击展开 · 拖动移动"
   >
     <div class="ball-glow" aria-hidden="true"></div>
     <div class="ball-ring" aria-hidden="true"></div>
-    <div class="ball-inner" ref="ballRef">
+    <div class="ball-inner">
       <span class="glyph">F</span>
       <span class="dot" aria-hidden="true"></span>
     </div>

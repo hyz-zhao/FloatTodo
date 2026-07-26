@@ -166,12 +166,22 @@ const dateStr = computed(() => {
         <span class="meta-issue">{{ issueNo }}</span>
       </div>
       <div class="actions">
-        <button class="icon-btn" title="收起为悬浮球" @click="onCollapse">
+        <button
+          class="icon-btn"
+          title="收起为悬浮球"
+          @mousedown.stop
+          @click.stop="onCollapse"
+        >
           <svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true">
             <path d="M3 9h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
           </svg>
         </button>
-        <button class="icon-btn danger" title="退出" @click="onQuit">
+        <button
+          class="icon-btn danger"
+          title="退出"
+          @mousedown.stop
+          @click.stop="onQuit"
+        >
           <svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true">
             <path
               d="M4 4l8 8M12 4l-8 8"
