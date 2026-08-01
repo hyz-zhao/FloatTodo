@@ -5,26 +5,25 @@ use chrono::Local;
 use rusqlite::{params, Connection};
 use std::path::PathBuf;
 use std::sync::Mutex;
-use tauri::{AppHandle, Manager, State};
+use tauri::State;
 
 /// 全局数据库状态（单连接 + Mutex 互斥）
 pub struct DbState(pub Mutex<Connection>);
 
-/// 获取应用数据目录下的 float-todo.db 路径
-fn db_path(app: &AppHandle) -> PathBuf {
-    let dir = app
-        .path()
-        .app_data_dir()
-        .expect("无法获取 app_data_dir，请检查 Tauri 配置");
+/// 获取项目目录下的 data/float-todo.db 路径
+fn db_path() -> PathBuf {
+    let dir = std::env::current_dir()
+        .expect("无法获取当前工作目录")
+        .join("data");
     if !dir.exists() {
-        std::fs::create_dir_all(&dir).expect("创建应用数据目录失败");
+        std::fs::create_dir_all(&dir).expect("创建数据目录失败");
     }
     dir.join("float-todo.db")
 }
 
 /// 初始化数据库（建表）
-pub fn init_db(app: &AppHandle) -> Connection {
-    let path = db_path(app);
+pub fn init_db() -> Connection {
+    let path = db_path();
     let conn = Connection::open(&path).expect("打开数据库失败");
     conn.execute_batch(
         r#"

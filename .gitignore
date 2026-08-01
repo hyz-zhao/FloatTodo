@@ -35,3 +35,6 @@ src-tauri/gen/schemas
 # 项目脚本产物
 icon-source.png
 make-icon.ps1
+
+# 本地数据（不提交）
+data/

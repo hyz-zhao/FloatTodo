@@ -11,9 +11,11 @@ use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, Webview
 /// 配置文件状态
 pub struct ConfigState(pub Mutex<WindowConfig>);
 
-/// 获取配置 json 的绝对路径
-fn config_path(app: &AppHandle) -> PathBuf {
-    let dir = app.path().app_data_dir().expect("无法获取 app_data_dir");
+/// 获取配置 json 的绝对路径（项目 data 目录）
+fn config_path() -> PathBuf {
+    let dir = std::env::current_dir()
+        .expect("无法获取当前工作目录")
+        .join("data");
     if !dir.exists() {
         let _ = fs::create_dir_all(&dir);
     }
@@ -21,8 +23,8 @@ fn config_path(app: &AppHandle) -> PathBuf {
 }
 
 /// 从磁盘加载配置（不存在则返回默认值）
-fn load_config(app: &AppHandle) -> WindowConfig {
-    let path = config_path(app);
+fn load_config() -> WindowConfig {
+    let path = config_path();
     if !path.exists() {
         return WindowConfig::default();
     }
@@ -31,8 +33,8 @@ fn load_config(app: &AppHandle) -> WindowConfig {
 }
 
 /// 把配置写回磁盘
-fn save_config(app: &AppHandle, cfg: &WindowConfig) -> Result<(), String> {
-    let path = config_path(app);
+fn save_config(cfg: &WindowConfig) -> Result<(), String> {
+    let path = config_path();
     let content = serde_json::to_string_pretty(cfg).map_err(|e| e.to_string())?;
     fs::write(&path, content).map_err(|e| e.to_string())?;
     Ok(())
@@ -54,7 +56,6 @@ fn get_config(state: tauri::State<'_, ConfigState>) -> Result<WindowConfig, Stri
 /// 保存浮窗配置（前端在拖动 / 尺寸变化后调用）
 #[tauri::command]
 fn save_window_config(
-    app: AppHandle,
     state: tauri::State<'_, ConfigState>,
     config: WindowConfig,
 ) -> Result<(), String> {
@@ -62,7 +63,7 @@ fn save_window_config(
         let mut cfg = state.0.lock().map_err(|e| e.to_string())?;
         *cfg = config.clone();
     }
-    save_config(&app, &config)
+    save_config(&config)
 }
 
 /// 切换为悬浮球模式：调整窗口尺寸到 BALL_SIZE
@@ -153,14 +154,12 @@ fn quit_app(app: AppHandle) {
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
-            let handle = app.handle().clone();
-
             // 初始化数据库
-            let conn = init_db(&handle);
+            let conn = init_db();
             app.manage(DbState(Mutex::new(conn)));
 
             // 加载配置
-            let cfg = load_config(&handle);
+            let cfg = load_config();
             app.manage(ConfigState(Mutex::new(cfg.clone())));
 
             // 根据记忆 / 默认值初始化主窗口位置和大小
