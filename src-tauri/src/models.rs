@@ -68,3 +68,20 @@ impl Default for WindowConfig {
         }
     }
 }
+
+/// 单日统计摘要
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DateSummary {
+    pub date: String,
+    pub total: i64,
+    pub completed: i64,
+}
+
+/// 单周统计摘要
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WeekSummary {
+    pub week_start: String,
+    pub week_end: String,
+    pub total: i64,
+    pub completed: i64,
+}

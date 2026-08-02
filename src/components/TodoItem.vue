@@ -3,7 +3,7 @@
 import { ref } from "vue";
 import type { Todo } from "../types";
 
-const props = defineProps<{ todo: Todo }>();
+const props = defineProps<{ todo: Todo; readonly?: boolean }>();
 const emit = defineEmits<{
   (e: "toggle", todo: Todo, completed: boolean): void;
   (e: "remove", todo: Todo): void;
@@ -15,7 +15,7 @@ const draft = ref(props.todo.text);
 const inputRef = ref<HTMLInputElement | null>(null);
 
 function startEdit() {
-  if (props.todo.completed) return;
+  if (props.readonly || props.todo.completed) return;
   draft.value = props.todo.text;
   editing.value = true;
   setTimeout(() => inputRef.value?.focus(), 0);
@@ -47,10 +47,11 @@ function onToggle(e: Event) {
 <template>
   <li class="todo-item" :class="{ done: todo.completed }">
     <!-- 复选框（带 SVG 笔触动画） -->
-    <label class="check">
+    <label class="check" :class="{ readonly: readonly }">
       <input
         type="checkbox"
         :checked="todo.completed"
+        :disabled="readonly"
         @change="onToggle"
       />
       <span class="box" aria-hidden="true">
@@ -82,7 +83,7 @@ function onToggle(e: Event) {
     </div>
 
     <button
-      v-if="!editing"
+      v-if="!editing && !readonly"
       class="remove"
       title="删除"
       @click="emit('remove', todo)"
@@ -176,6 +177,16 @@ function onToggle(e: Event) {
 .check:hover .box {
   border-color: var(--c-ink);
   transform: scale(1.06);
+}
+.check.readonly {
+  cursor: default;
+}
+.check.readonly .box {
+  cursor: default;
+}
+.check.readonly:hover .box {
+  border-color: var(--c-ink-soft);
+  transform: none;
 }
 .check input:checked + .box {
   background: var(--c-accent);

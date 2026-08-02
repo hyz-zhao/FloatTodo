@@ -27,3 +27,18 @@ export type RangePreset = "today" | "tomorrow" | "this-week" | "next-week" | "cu
 
 /** 前端 UI 当前形态 */
 export type UiMode = "ball" | "panel";
+
+/** 单日统计摘要 */
+export interface DateSummary {
+  date: string;
+  total: number;
+  completed: number;
+}
+
+/** 单周统计摘要 */
+export interface WeekSummary {
+  week_start: string;
+  week_end: string;
+  total: number;
+  completed: number;
+}

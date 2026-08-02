@@ -15,7 +15,10 @@ import {
 import { rangeForPreset } from "../date";
 import type { Todo } from "../types";
 import DateRangePicker from "./DateRangePicker.vue";
+import HistoryView from "./HistoryView.vue";
 import TodoItem from "./TodoItem.vue";
+
+const activeTab = ref<"editor" | "history">("editor");
 
 const start = ref("");
 const end = ref("");
@@ -194,8 +197,25 @@ const dateStr = computed(() => {
       </div>
     </header>
 
-    <!-- 元信息条（编辑感：期号 · 日期 · 计数） -->
-    <div class="meta-bar">
+    <!-- Tab 切换 -->
+    <nav class="tab-bar">
+      <button
+        :class="{ active: activeTab === 'editor' }"
+        @click="activeTab = 'editor'"
+      >
+        待办
+      </button>
+      <button
+        :class="{ active: activeTab === 'history' }"
+        @click="activeTab = 'history'"
+      >
+        记录
+      </button>
+    </nav>
+
+    <template v-if="activeTab === 'editor'">
+      <!-- 元信息条（编辑感：期号 · 日期 · 计数） -->
+      <div class="meta-bar">
       <span class="meta-item">{{ dateStr }}</span>
       <span class="meta-sep">·</span>
       <span class="meta-item count">
@@ -245,6 +265,9 @@ const dateStr = computed(() => {
       <span class="composer-hint" v-if="!draft">↵</span>
       <span class="composer-hint" v-else>↵</span>
     </footer>
+    </template>
+
+    <HistoryView v-if="activeTab === 'history'" />
   </div>
 </template>
 
@@ -339,6 +362,35 @@ const dateStr = computed(() => {
 }
 .icon-btn.danger:hover {
   background: var(--c-accent);
+}
+
+/* —— Tab 切换栏 —— */
+.tab-bar {
+  display: flex;
+  gap: 0;
+  padding: 0 16px;
+  background: var(--c-paper);
+  border-bottom: 1px solid var(--c-line);
+  flex-shrink: 0;
+}
+.tab-bar button {
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  padding: 8px 16px 7px;
+  background: transparent;
+  color: var(--c-ink-soft);
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s var(--ease-out);
+  margin-bottom: -1px;
+}
+.tab-bar button.active {
+  color: var(--c-ink);
+  border-bottom-color: var(--c-accent);
+}
+.tab-bar button:hover:not(.active) {
+  color: var(--c-ink);
 }
 
 /* —— 元信息条 —— */

@@ -1,7 +1,10 @@
 mod db;
 mod models;
 
-use db::{add_todo, clear_completed, delete_todo, init_db, list_todos, update_todo, DbState};
+use db::{
+    add_todo, clear_completed, delete_todo, history_daily_summary, history_weekly_summary,
+    init_db, list_todos, list_todos_for_date, update_todo, DbState,
+};
 use models::WindowConfig;
 use std::fs;
 use std::path::PathBuf;
@@ -204,6 +207,9 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             list_todos,
+            list_todos_for_date,
+            history_daily_summary,
+            history_weekly_summary,
             add_todo,
             update_todo,
             delete_todo,

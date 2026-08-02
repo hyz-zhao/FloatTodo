@@ -1,6 +1,6 @@
 // 封装对 Tauri 后端命令的调用，统一在此处 import，便于维护
 import { invoke } from "@tauri-apps/api/core";
-import type { Todo, WindowConfig } from "./types";
+import type { DateSummary, Todo, WeekSummary, WindowConfig } from "./types";
 
 /** 查询某日期范围内的事项列表 */
 export function apiListTodos(rangeStart: string, rangeEnd: string) {
@@ -66,6 +66,27 @@ export function apiCollapseToBall() {
 /** 切换为主面板模式 */
 export function apiExpandToPanel() {
   return invoke<void>("expand_to_panel");
+}
+
+/** 查询某一天包含的所有待办（支持跨天） */
+export function apiListTodosForDate(date: string) {
+  return invoke<Todo[]>("list_todos_for_date", { date });
+}
+
+/** 日统计摘要 */
+export function apiHistoryDailySummary(dateFrom: string, dateTo: string) {
+  return invoke<DateSummary[]>("history_daily_summary", {
+    dateFrom,
+    dateTo,
+  });
+}
+
+/** 周统计摘要 */
+export function apiHistoryWeeklySummary(dateFrom: string, dateTo: string) {
+  return invoke<WeekSummary[]>("history_weekly_summary", {
+    dateFrom,
+    dateTo,
+  });
 }
 
 /** 退出应用 */
