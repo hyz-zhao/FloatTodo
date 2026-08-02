@@ -173,6 +173,7 @@ pub fn history_daily_summary(
                     SUM(CASE WHEN completed = 1 THEN 1 ELSE 0 END) as completed
              FROM todos
              WHERE range_start >= ?1 AND range_start <= ?2
+               AND range_start = range_end
              GROUP BY range_start
              ORDER BY range_start DESC",
         )
@@ -251,7 +252,7 @@ pub fn history_weekly_summary(
     Ok(out)
 }
 
-/// 查询某一天包含的所有待办（支持跨天待办）
+/// 查询某一天包含的所有待办（仅单日待办，用于日视图展开）
 #[tauri::command]
 pub fn list_todos_for_date(
     state: State<'_, DbState>,
@@ -262,12 +263,47 @@ pub fn list_todos_for_date(
         .prepare(
             "SELECT id, text, completed, range_start, range_end, created_at
              FROM todos
-             WHERE range_start <= ?1 AND range_end >= ?1
+             WHERE range_start = ?1 AND range_end = ?1
              ORDER BY completed ASC, id DESC",
         )
         .map_err(|e| e.to_string())?;
     let rows = stmt
         .query_map(params![date], |row| {
+            Ok(Todo {
+                id: row.get(0)?,
+                text: row.get(1)?,
+                completed: row.get::<_, i64>(2)? != 0,
+                range_start: row.get(3)?,
+                range_end: row.get(4)?,
+                created_at: row.get(5)?,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+    let mut out = Vec::new();
+    for r in rows {
+        out.push(r.map_err(|e| e.to_string())?);
+    }
+    Ok(out)
+}
+
+/// 按 range_start 范围查询待办（用于周视图展开）
+#[tauri::command]
+pub fn list_todos_by_range(
+    state: State<'_, DbState>,
+    range_start: String,
+    range_end: String,
+) -> Result<Vec<Todo>, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, text, completed, range_start, range_end, created_at
+             FROM todos
+             WHERE range_start >= ?1 AND range_start <= ?2
+             ORDER BY completed ASC, id DESC",
+        )
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map(params![range_start, range_end], |row| {
             Ok(Todo {
                 id: row.get(0)?,
                 text: row.get(1)?,

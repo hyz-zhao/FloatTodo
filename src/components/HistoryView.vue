@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import {
   apiHistoryDailySummary,
   apiHistoryWeeklySummary,
+  apiListTodosByRange,
   apiListTodosForDate,
 } from "../api";
 import { fmtDate, humanDate, addDays, parseDate } from "../date";
@@ -14,6 +15,8 @@ const dailySummaries = ref<DateSummary[]>([]);
 const weeklySummaries = ref<WeekSummary[]>([]);
 const expandedDate = ref<string | null>(null);
 const expandedTodos = ref<Todo[]>([]);
+const expandedWeek = ref<string | null>(null);
+const expandedWeekTodos = ref<Todo[]>([]);
 const loading = ref(false);
 
 const PAGE_DAYS = 30;
@@ -47,8 +50,23 @@ async function toggleDate(date: string) {
     return;
   }
   expandedDate.value = date;
+  expandedWeek.value = null;
   loading.value = true;
   expandedTodos.value = await apiListTodosForDate(date);
+  loading.value = false;
+}
+
+async function toggleWeek(weekStart: string, weekEnd: string) {
+  const key = weekStart;
+  if (expandedWeek.value === key) {
+    expandedWeek.value = null;
+    expandedWeekTodos.value = [];
+    return;
+  }
+  expandedWeek.value = key;
+  expandedDate.value = null;
+  loading.value = true;
+  expandedWeekTodos.value = await apiListTodosByRange(weekStart, weekEnd);
   loading.value = false;
 }
 
@@ -154,8 +172,12 @@ onMounted(() => {
         v-for="s in weeklySummaries"
         :key="s.week_start"
         class="week-card"
+        :class="{ expanded: expandedWeek === s.week_start }"
       >
-        <div class="week-card-header">
+        <div
+          class="week-card-header"
+          @click="toggleWeek(s.week_start, s.week_end)"
+        >
           <div class="week-info">
             <span class="week-range">{{ describeWeekRange(s) }}</span>
             <span class="week-date-sub">{{ s.week_start }} - {{ s.week_end }}</span>
@@ -163,8 +185,11 @@ onMounted(() => {
           <div class="week-stats">
             <em>{{ s.completed }}</em> / {{ s.total }} 已完成
           </div>
+          <span class="expand-icon">{{
+            expandedWeek === s.week_start ? "▾" : "▸"
+          }}</span>
         </div>
-        <div class="week-progress">
+        <div class="week-progress" @click="toggleWeek(s.week_start, s.week_end)">
           <div class="progress-bar">
             <div
               class="progress-fill"
@@ -172,6 +197,20 @@ onMounted(() => {
               :style="{ width: (s.total === 0 ? 0 : Math.round((s.completed / s.total) * 100)) + '%' }"
             ></div>
           </div>
+        </div>
+        <div v-if="expandedWeek === s.week_start" class="day-card-body">
+          <div v-if="loading" class="loading">加载中...</div>
+          <div v-else-if="expandedWeekTodos.length === 0" class="no-todos">
+            该周无待办事项
+          </div>
+          <ul v-else class="todo-list">
+            <TodoItem
+              v-for="t in expandedWeekTodos"
+              :key="t.id"
+              :todo="t"
+              :readonly="true"
+            />
+          </ul>
         </div>
       </div>
     </div>
@@ -332,13 +371,24 @@ onMounted(() => {
 /* —— 周卡片 —— */
 .week-card {
   border-bottom: 1px solid var(--c-line);
-  padding: 12px 18px;
 }
 .week-card-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
+  gap: 10px;
+  padding: 12px 18px 6px;
+  cursor: pointer;
+  transition: background 0.15s var(--ease-out);
+}
+.week-card-header:hover {
+  background: var(--c-paper-2);
+}
+.week-card.expanded .week-card-header {
+  background: var(--c-paper-2);
+}
+.week-progress {
+  padding: 0 18px 12px;
+  cursor: pointer;
 }
 .week-info {
   display: flex;

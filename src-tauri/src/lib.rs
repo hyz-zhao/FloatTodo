@@ -3,7 +3,7 @@ mod models;
 
 use db::{
     add_todo, clear_completed, delete_todo, history_daily_summary, history_weekly_summary,
-    init_db, list_todos, list_todos_for_date, update_todo, DbState,
+    init_db, list_todos, list_todos_by_range, list_todos_for_date, update_todo, DbState,
 };
 use models::WindowConfig;
 use std::fs;
@@ -208,6 +208,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             list_todos,
             list_todos_for_date,
+            list_todos_by_range,
             history_daily_summary,
             history_weekly_summary,
             add_todo,

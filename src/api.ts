@@ -89,6 +89,14 @@ export function apiHistoryWeeklySummary(dateFrom: string, dateTo: string) {
   });
 }
 
+/** 按 range_start 范围查询待办（用于周视图展开） */
+export function apiListTodosByRange(rangeStart: string, rangeEnd: string) {
+  return invoke<Todo[]>("list_todos_by_range", {
+    rangeStart,
+    rangeEnd,
+  });
+}
+
 /** 退出应用 */
 export function apiQuit() {
   return invoke<void>("quit_app");
