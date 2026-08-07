@@ -39,3 +39,6 @@ make-shortcut.ps1
 
 # 本地数据（不提交）
 data/
+
+# 本地文档（不提交）
+TODO.md
