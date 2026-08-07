@@ -9,8 +9,10 @@ import {
 import { fmtDate, humanDate, addDays, parseDate } from "../date";
 import type { DateSummary, Todo, WeekSummary } from "../types";
 import TodoItem from "./TodoItem.vue";
+import { useToast } from "../composables/useToast";
 
 const viewMode = ref<"daily" | "weekly">("daily");
+const { show } = useToast();
 const dailySummaries = ref<DateSummary[]>([]);
 const weeklySummaries = ref<WeekSummary[]>([]);
 const expandedDate = ref<string | null>(null);
@@ -32,15 +34,20 @@ function progressPercent(s: DateSummary): number {
 }
 
 async function loadSummaries() {
-  dailySummaries.value = await apiHistoryDailySummary(
-    rangeStart.value,
-    rangeEnd.value,
-  );
-  weeklySummaries.value = await apiHistoryWeeklySummary(
-    rangeStart.value,
-    rangeEnd.value,
-  );
-  hasMore.value = dailySummaries.value.length >= PAGE_DAYS;
+  try {
+    dailySummaries.value = await apiHistoryDailySummary(
+      rangeStart.value,
+      rangeEnd.value,
+    );
+    weeklySummaries.value = await apiHistoryWeeklySummary(
+      rangeStart.value,
+      rangeEnd.value,
+    );
+    hasMore.value = dailySummaries.value.length >= PAGE_DAYS;
+  } catch (e) {
+    console.error("加载历史摘要失败", e);
+    show("加载历史记录失败");
+  }
 }
 
 async function toggleDate(date: string) {
@@ -52,7 +59,12 @@ async function toggleDate(date: string) {
   expandedDate.value = date;
   expandedWeek.value = null;
   loading.value = true;
-  expandedTodos.value = await apiListTodosForDate(date);
+  try {
+    expandedTodos.value = await apiListTodosForDate(date);
+  } catch (e) {
+    console.error("加载日期待办失败", e);
+    show("加载待办详情失败");
+  }
   loading.value = false;
 }
 
@@ -66,7 +78,12 @@ async function toggleWeek(weekStart: string, weekEnd: string) {
   expandedWeek.value = key;
   expandedDate.value = null;
   loading.value = true;
-  expandedWeekTodos.value = await apiListTodosByRange(weekStart, weekEnd);
+  try {
+    expandedWeekTodos.value = await apiListTodosByRange(weekStart, weekEnd);
+  } catch (e) {
+    console.error("加载周待办失败", e);
+    show("加载待办详情失败");
+  }
   loading.value = false;
 }
 

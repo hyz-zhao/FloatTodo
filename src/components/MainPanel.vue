@@ -17,8 +17,11 @@ import type { Todo } from "../types";
 import DateRangePicker from "./DateRangePicker.vue";
 import HistoryView from "./HistoryView.vue";
 import TodoItem from "./TodoItem.vue";
+import { useToast } from "../composables/useToast";
 
 const activeTab = ref<"editor" | "history">("editor");
+
+const { show } = useToast();
 
 const start = ref("");
 const end = ref("");
@@ -29,26 +32,36 @@ const hasAnyCompleted = computed(() => todos.value.some((t) => t.completed));
 const pendingCount = computed(() => todos.value.filter((t) => !t.completed).length);
 
 async function loadConfig() {
-  const cfg = await apiGetConfig();
-  if (cfg.last_range_start && cfg.last_range_end) {
-    start.value = cfg.last_range_start;
-    end.value = cfg.last_range_end;
-  } else {
-    const t = rangeForPreset("today");
-    start.value = t.start;
-    end.value = t.end;
+  try {
+    const cfg = await apiGetConfig();
+    if (cfg.last_range_start && cfg.last_range_end) {
+      start.value = cfg.last_range_start;
+      end.value = cfg.last_range_end;
+    } else {
+      const t = rangeForPreset("today");
+      start.value = t.start;
+      end.value = t.end;
+    }
+  } catch (e) {
+    console.error("加载配置失败", e);
+    show("加载配置失败");
   }
 }
 
 async function reload() {
   if (!start.value || !end.value) return;
-  todos.value = await apiListTodos(start.value, end.value);
-  const cfg = await apiGetConfig();
-  await apiSaveWindowConfig({
-    ...cfg,
-    last_range_start: start.value,
-    last_range_end: end.value,
-  });
+  try {
+    todos.value = await apiListTodos(start.value, end.value);
+    const cfg = await apiGetConfig();
+    await apiSaveWindowConfig({
+      ...cfg,
+      last_range_start: start.value,
+      last_range_end: end.value,
+    });
+  } catch (e) {
+    console.error("加载待办列表失败", e);
+    show("加载待办列表失败");
+  }
 }
 
 function onRangeChange(s: string, e: string) {
@@ -63,9 +76,14 @@ watch([start, end], () => {
 async function onAdd() {
   const text = draft.value.trim();
   if (!text) return;
-  await apiAddTodo(text, start.value, end.value);
-  draft.value = "";
-  await reload();
+  try {
+    await apiAddTodo(text, start.value, end.value);
+    draft.value = "";
+    await reload();
+  } catch (e) {
+    console.error("添加待办失败", e);
+    show("添加待办失败");
+  }
 }
 
 function onKeyEnter() {
@@ -73,24 +91,44 @@ function onKeyEnter() {
 }
 
 async function onToggle(todo: Todo, completed: boolean) {
-  await apiUpdateTodo(todo.id, { completed });
-  await reload();
+  try {
+    await apiUpdateTodo(todo.id, { completed });
+    await reload();
+  } catch (e) {
+    console.error("更新待办状态失败", e);
+    show("更新待办状态失败");
+  }
 }
 
 async function onEdit(todo: Todo, text: string) {
-  await apiUpdateTodo(todo.id, { text });
-  await reload();
+  try {
+    await apiUpdateTodo(todo.id, { text });
+    await reload();
+  } catch (e) {
+    console.error("编辑待办失败", e);
+    show("编辑待办失败");
+  }
 }
 
 async function onRemove(todo: Todo) {
-  await apiDeleteTodo(todo.id);
-  await reload();
+  try {
+    await apiDeleteTodo(todo.id);
+    await reload();
+  } catch (e) {
+    console.error("删除待办失败", e);
+    show("删除待办失败");
+  }
 }
 
 async function onClearCompleted() {
   if (!hasAnyCompleted.value) return;
-  await apiClearCompleted(start.value, end.value);
-  await reload();
+  try {
+    await apiClearCompleted(start.value, end.value);
+    await reload();
+  } catch (e) {
+    console.error("清除已完成待办失败", e);
+    show("清除已完成待办失败");
+  }
 }
 
 async function onCollapse() {
@@ -109,14 +147,24 @@ async function onCollapse() {
       panel_height: size.height,
     });
   } catch (e) {
-    console.error(e);
+    console.error("保存窗口配置失败", e);
   }
-  await apiCollapseToBall();
+  try {
+    await apiCollapseToBall();
+  } catch (e) {
+    console.error("收起为悬浮球失败", e);
+    show("收起为悬浮球失败");
+  }
 }
 
 async function onQuit() {
   if (confirm("确定要退出 FloatTodo 吗？")) {
-    await apiQuit();
+    try {
+      await apiQuit();
+    } catch (e) {
+      console.error("退出应用失败", e);
+      show("退出应用失败");
+    }
   }
 }
 
@@ -124,7 +172,6 @@ const now = ref(new Date());
 onMounted(async () => {
   await loadConfig();
   await reload();
-  // 每分钟更新一次时间显示（编辑感元信息）
   setInterval(() => {
     now.value = new Date();
   }, 60_000);

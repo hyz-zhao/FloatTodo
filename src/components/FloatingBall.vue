@@ -3,9 +3,11 @@
 import { onBeforeUnmount, onMounted, ref } from "vue";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { apiExpandToPanel, apiSaveWindowConfig, apiGetConfig } from "../api";
+import { useToast } from "../composables/useToast";
 
 const isDragging = ref(false);
 const dragMoved = ref(false);
+const { show } = useToast();
 let startX = 0;
 let startY = 0;
 
@@ -35,7 +37,12 @@ async function onMouseUp(_e: MouseEvent) {
   window.removeEventListener("mousemove", onMouseMove);
   // 没有拖动 = 单击
   if (!dragMoved.value && !isDragging.value) {
-    await apiExpandToPanel();
+    try {
+      await apiExpandToPanel();
+    } catch (e) {
+      console.error("展开面板失败", e);
+      show("展开面板失败");
+    }
   }
   // 拖动结束后保存新位置
   if (isDragging.value) {

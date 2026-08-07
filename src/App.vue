@@ -4,6 +4,7 @@ import { onBeforeUnmount, onMounted, ref } from "vue";
 import { listen } from "@tauri-apps/api/event";
 import FloatingBall from "./components/FloatingBall.vue";
 import MainPanel from "./components/MainPanel.vue";
+import Toast from "./components/Toast.vue";
 import type { UiMode } from "./types";
 
 const mode = ref<UiMode>("ball");
@@ -25,6 +26,7 @@ onBeforeUnmount(() => {
       <MainPanel v-if="mode === 'panel'" key="panel" />
       <FloatingBall v-else key="ball" />
     </Transition>
+    <Toast />
   </main>
 </template>
 
