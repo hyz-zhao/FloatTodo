@@ -67,13 +67,18 @@ async function reload() {
   }
 }
 
+let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
 function onRangeChange(s: string, e: string) {
   start.value = s;
   end.value = e;
 }
 
 watch([start, end], () => {
-  reload();
+  if (debounceTimer) clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => {
+    reload();
+  }, 200);
 });
 
 async function onAdd() {
@@ -189,6 +194,10 @@ onBeforeUnmount(() => {
   if (timer) {
     clearInterval(timer);
     timer = null;
+  }
+  if (debounceTimer) {
+    clearTimeout(debounceTimer);
+    debounceTimer = null;
   }
 });
 
