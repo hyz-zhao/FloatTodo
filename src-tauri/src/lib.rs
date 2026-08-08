@@ -28,7 +28,7 @@ fn config_path() -> Result<PathBuf, String> {
     Ok(dir.join("config.json"))
 }
 
-/// 从磁盘加载配置（不存在则返回默认值）
+/// 从磁盘加载配置（不存在则返回默认值；损坏则备份后返回默认值）
 fn load_config() -> WindowConfig {
     let path = match config_path() {
         Ok(p) => p,
@@ -37,8 +37,25 @@ fn load_config() -> WindowConfig {
     if !path.exists() {
         return WindowConfig::default();
     }
-    let content = fs::read_to_string(&path).unwrap_or_default();
-    serde_json::from_str(&content).unwrap_or_default()
+    let content = match fs::read_to_string(&path) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("读取配置文件失败: {}", e);
+            return WindowConfig::default();
+        }
+    };
+    match serde_json::from_str(&content) {
+        Ok(cfg) => cfg,
+        Err(e) => {
+            eprintln!("配置文件解析失败: {}", e);
+            // 备份损坏的配置文件
+            let bak = path.with_extension("json.bak");
+            let _ = fs::write(&bak, &content);
+            // 删除损坏文件，下次保存时会重新生成
+            let _ = fs::remove_file(&path);
+            WindowConfig::default()
+        }
+    }
 }
 
 /// 把配置写回磁盘
