@@ -17,11 +17,14 @@ import type { Todo } from "../types";
 import DateRangePicker from "./DateRangePicker.vue";
 import HistoryView from "./HistoryView.vue";
 import TodoItem from "./TodoItem.vue";
+import ConfirmDialog from "./ConfirmDialog.vue";
 import { useToast } from "../composables/useToast";
 
 const activeTab = ref<"editor" | "history">("editor");
 
 const { show } = useToast();
+
+const quitDialogVisible = ref(false);
 
 const start = ref("");
 const end = ref("");
@@ -158,13 +161,16 @@ async function onCollapse() {
 }
 
 async function onQuit() {
-  if (confirm("确定要退出 FloatTodo 吗？")) {
-    try {
-      await apiQuit();
-    } catch (e) {
-      console.error("退出应用失败", e);
-      show("退出应用失败");
-    }
+  quitDialogVisible.value = true;
+}
+
+async function doQuit() {
+  quitDialogVisible.value = false;
+  try {
+    await apiQuit();
+  } catch (e) {
+    console.error("退出应用失败", e);
+    show("退出应用失败");
   }
 }
 
@@ -324,6 +330,13 @@ const dateStr = computed(() => {
     </template>
 
     <HistoryView v-if="activeTab === 'history'" />
+
+    <ConfirmDialog
+      :visible="quitDialogVisible"
+      message="确定要退出 FloatTodo 吗？"
+      @confirm="doQuit"
+      @cancel="quitDialogVisible = false"
+    />
   </div>
 </template>
 
