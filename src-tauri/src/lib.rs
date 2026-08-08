@@ -14,20 +14,26 @@ use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, Webview
 /// 配置文件状态
 pub struct ConfigState(pub Mutex<WindowConfig>);
 
-/// 获取配置 json 的绝对路径（项目 data 目录）
-fn config_path() -> PathBuf {
-    let dir = std::env::current_dir()
-        .expect("无法获取当前工作目录")
-        .join("data");
+/// 获取配置 json 的绝对路径（exe 同目录下的 data 目录）
+fn config_path() -> Result<PathBuf, String> {
+    let exe_dir = std::env::current_exe()
+        .map_err(|e| format!("无法获取exe路径: {}", e))?
+        .parent()
+        .ok_or("无法获取exe父目录".to_string())?
+        .to_path_buf();
+    let dir = exe_dir.join("data");
     if !dir.exists() {
         let _ = fs::create_dir_all(&dir);
     }
-    dir.join("config.json")
+    Ok(dir.join("config.json"))
 }
 
 /// 从磁盘加载配置（不存在则返回默认值）
 fn load_config() -> WindowConfig {
-    let path = config_path();
+    let path = match config_path() {
+        Ok(p) => p,
+        Err(_) => return WindowConfig::default(),
+    };
     if !path.exists() {
         return WindowConfig::default();
     }
@@ -37,7 +43,7 @@ fn load_config() -> WindowConfig {
 
 /// 把配置写回磁盘
 fn save_config(cfg: &WindowConfig) -> Result<(), String> {
-    let path = config_path();
+    let path = config_path()?;
     let content = serde_json::to_string_pretty(cfg).map_err(|e| e.to_string())?;
     fs::write(&path, content).map_err(|e| e.to_string())?;
     Ok(())
@@ -158,7 +164,8 @@ pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
             // 初始化数据库
-            let conn = init_db();
+            let conn = init_db()
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
             app.manage(DbState(Mutex::new(conn)));
 
             // 加载配置
@@ -222,5 +229,8 @@ pub fn run() {
             quit_app,
         ])
         .run(tauri::generate_context!())
-        .expect("启动 Tauri 应用失败");
+        .unwrap_or_else(|e| {
+            eprintln!("启动 FloatTodo 失败: {}", e);
+            std::process::exit(1);
+        });
 }

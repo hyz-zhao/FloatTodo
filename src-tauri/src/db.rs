@@ -13,21 +13,26 @@ use tauri::State;
 /// 全局数据库状态（单连接 + Mutex 互斥）
 pub struct DbState(pub Mutex<Connection>);
 
-/// 获取项目目录下的 data/float-todo.db 路径
-fn db_path() -> PathBuf {
-    let dir = std::env::current_dir()
-        .expect("无法获取当前工作目录")
-        .join("data");
+/// 获取 exe 同目录下的 data/float-todo.db 路径
+fn db_path() -> Result<PathBuf, String> {
+    let exe_dir = std::env::current_exe()
+        .map_err(|e| format!("无法获取exe路径: {}", e))?
+        .parent()
+        .ok_or("无法获取exe父目录".to_string())?
+        .to_path_buf();
+    let dir = exe_dir.join("data");
     if !dir.exists() {
-        std::fs::create_dir_all(&dir).expect("创建数据目录失败");
+        std::fs::create_dir_all(&dir)
+            .map_err(|e| format!("创建数据目录失败: {}", e))?;
     }
-    dir.join("float-todo.db")
+    Ok(dir.join("float-todo.db"))
 }
 
 /// 初始化数据库（建表）
-pub fn init_db() -> Connection {
-    let path = db_path();
-    let conn = Connection::open(&path).expect("打开数据库失败");
+pub fn init_db() -> Result<Connection, String> {
+    let path = db_path()?;
+    let conn = Connection::open(&path)
+        .map_err(|e| format!("打开数据库失败: {}", e))?;
     conn.execute_batch(
         r#"
         CREATE TABLE IF NOT EXISTS todos (
@@ -42,8 +47,8 @@ pub fn init_db() -> Connection {
             ON todos(range_start, range_end);
         "#,
     )
-    .expect("初始化数据库表失败");
-    conn
+    .map_err(|e| format!("初始化数据库表失败: {}", e))?;
+    Ok(conn)
 }
 
 /// 查询某个日期范围内的事项，按未完成优先、再按创建时间倒序
