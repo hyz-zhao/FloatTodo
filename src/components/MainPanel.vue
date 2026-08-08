@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 主面板：编辑感杂志排版，衬线品牌 + 元信息 + 日期 + 列表 + 输入
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
   apiAddTodo,
   apiClearCompleted,
@@ -169,12 +169,21 @@ async function onQuit() {
 }
 
 const now = ref(new Date());
+let timer: ReturnType<typeof setInterval> | null = null;
+
 onMounted(async () => {
   await loadConfig();
   await reload();
-  setInterval(() => {
+  timer = setInterval(() => {
     now.value = new Date();
   }, 60_000);
+});
+
+onBeforeUnmount(() => {
+  if (timer) {
+    clearInterval(timer);
+    timer = null;
+  }
 });
 
 const issueNo = computed(() => {
