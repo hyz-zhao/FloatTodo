@@ -25,6 +25,7 @@ const activeTab = ref<"editor" | "history">("editor");
 const { show } = useToast();
 
 const quitDialogVisible = ref(false);
+const clearConfirmVisible = ref(false);
 
 const start = ref("");
 const end = ref("");
@@ -130,6 +131,11 @@ async function onRemove(todo: Todo) {
 
 async function onClearCompleted() {
   if (!hasAnyCompleted.value) return;
+  clearConfirmVisible.value = true;
+}
+
+async function doClearCompleted() {
+  clearConfirmVisible.value = false;
   try {
     await apiClearCompleted(start.value, end.value);
     await reload();
@@ -345,6 +351,12 @@ const dateStr = computed(() => {
       message="确定要退出 FloatTodo 吗？"
       @confirm="doQuit"
       @cancel="quitDialogVisible = false"
+    />
+    <ConfirmDialog
+      :visible="clearConfirmVisible"
+      message="确定要清除所有已完成待办吗？此操作不可撤销。"
+      @confirm="doClearCompleted"
+      @cancel="clearConfirmVisible = false"
     />
   </div>
 </template>
