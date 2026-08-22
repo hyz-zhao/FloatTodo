@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { onMounted, ref } from "vue";
 import {
   apiHistoryDailySummary,
   apiHistoryWeeklySummary,
@@ -9,6 +9,7 @@ import {
 import { fmtDate, humanDate, addDays, parseDate } from "../date";
 import type { DateSummary, Todo, WeekSummary } from "../types";
 import TodoItem from "./TodoItem.vue";
+import EmptyState from "./EmptyState.vue";
 import { useToast } from "../composables/useToast";
 
 const viewMode = ref<"daily" | "weekly">("daily");
@@ -89,6 +90,7 @@ async function toggleWeek(weekStart: string, weekEnd: string) {
 
 async function loadMore() {
   const end = parseDate(rangeStart.value);
+  if (!end) return;
   const start = addDays(end, -(PAGE_DAYS - 1));
   rangeStart.value = fmtDate(start);
   await loadSummaries();
@@ -97,6 +99,7 @@ async function loadMore() {
 function describeWeekRange(ws: WeekSummary): string {
   const s = parseDate(ws.week_start);
   const e = parseDate(ws.week_end);
+  if (!s || !e) return ws.week_start;
   const sm = s.getMonth() + 1;
   const sd = s.getDate();
   const em = e.getMonth() + 1;
@@ -130,11 +133,11 @@ onMounted(() => {
 
     <!-- 日视图 -->
     <div v-if="viewMode === 'daily'" class="history-list">
-      <div v-if="dailySummaries.length === 0" class="empty">
-        <div class="empty-mark">— § —</div>
-        <div class="empty-text">暂无记录</div>
-        <div class="empty-hint">添加待办后这里会出现历史记录</div>
-      </div>
+      <EmptyState
+        v-if="dailySummaries.length === 0"
+        text="暂无记录"
+        hint="添加待办后这里会出现历史记录"
+      />
       <div
         v-for="s in dailySummaries"
         :key="s.date"
@@ -180,11 +183,11 @@ onMounted(() => {
 
     <!-- 周视图 -->
     <div v-if="viewMode === 'weekly'" class="history-list">
-      <div v-if="weeklySummaries.length === 0" class="empty">
-        <div class="empty-mark">— § —</div>
-        <div class="empty-text">暂无记录</div>
-        <div class="empty-hint">添加待办后这里会出现历史记录</div>
-      </div>
+      <EmptyState
+        v-if="weeklySummaries.length === 0"
+        text="暂无记录"
+        hint="添加待办后这里会出现历史记录"
+      />
       <div
         v-for="s in weeklySummaries"
         :key="s.week_start"
@@ -335,11 +338,6 @@ onMounted(() => {
 
 .day-progress {
   width: 100px;
-  display: none;
-}
-.day-card.expanded .day-progress,
-.day-card-header:hover .day-progress {
-  display: none;
 }
 
 .progress-bar {
@@ -457,32 +455,5 @@ onMounted(() => {
 }
 .load-more:hover {
   color: var(--c-ink);
-}
-
-/* —— 空状态 —— */
-.empty {
-  text-align: center;
-  padding: 56px 24px 32px;
-}
-.empty-mark {
-  font-family: var(--font-display);
-  font-style: italic;
-  font-size: 18px;
-  color: var(--c-ink-dim);
-  letter-spacing: 0.1em;
-  margin-bottom: 16px;
-}
-.empty-text {
-  font-family: var(--font-display);
-  font-size: 18px;
-  color: var(--c-ink-soft);
-  margin-bottom: 6px;
-  letter-spacing: 0.02em;
-}
-.empty-hint {
-  font-size: 11px;
-  color: var(--c-ink-dim);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
 }
 </style>

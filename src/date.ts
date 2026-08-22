@@ -9,10 +9,13 @@ export function fmtDate(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-/** 解析 yyyy-MM-dd 字符串为本地 Date（00:00:00） */
-export function parseDate(s: string): Date {
+/** 解析 yyyy-MM-dd 字符串为本地 Date（00:00:00），非法输入返回 null */
+export function parseDate(s: string): Date | null {
+  if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
   const [y, m, d] = s.split("-").map(Number);
-  return new Date(y, (m || 1) - 1, d || 1);
+  const date = new Date(y, (m || 1) - 1, d || 1);
+  if (isNaN(date.getTime())) return null;
+  return date;
 }
 
 /** 一周从周一开始；返回给定日期所在周的周一 */
@@ -35,6 +38,7 @@ export function addDays(d: Date, n: number): Date {
 /** 人类可读日期（中文）：今天/昨天/M月D日/yyyy年M月D日 */
 export function humanDate(s: string): string {
   const d = parseDate(s);
+  if (!d) return s;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const diffDays = Math.round((d.getTime() - today.getTime()) / 86400000);

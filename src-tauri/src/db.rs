@@ -209,14 +209,17 @@ pub fn history_weekly_summary(
     let conn = state.0.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn
         .prepare(
-            "SELECT range_start, completed FROM todos
+            "SELECT range_start, COUNT(*) as total,
+                    SUM(CASE WHEN completed = 1 THEN 1 ELSE 0 END) as completed
+             FROM todos
              WHERE range_start >= ?1 AND range_start <= ?2
+             GROUP BY range_start
              ORDER BY range_start DESC",
         )
         .map_err(|e| e.to_string())?;
-    let rows: Vec<(String, bool)> = stmt
+    let rows: Vec<(String, i64, i64)> = stmt
         .query_map(params![date_from, date_to], |row| {
-            Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)? != 0))
+            Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?, row.get::<_, i64>(2)?))
         })
         .map_err(|e| e.to_string())?
         .collect::<Result<_, _>>()
@@ -224,15 +227,13 @@ pub fn history_weekly_summary(
 
     // 按 ISO 周分组
     let mut weeks: BTreeMap<(i32, u32), (i64, i64)> = BTreeMap::new();
-    for (date_str, completed) in &rows {
+    for (date_str, total, completed) in &rows {
         if let Ok(d) = NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
             let iso = d.iso_week();
             let key = (iso.year(), iso.week());
             let entry = weeks.entry(key).or_insert((0, 0));
-            entry.0 += 1;
-            if *completed {
-                entry.1 += 1;
-            }
+            entry.0 += total;
+            entry.1 += completed;
         }
     }
 

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // 主面板：编辑感杂志排版，衬线品牌 + 元信息 + 日期 + 列表 + 输入
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   apiAddTodo,
   apiClearCompleted,
@@ -18,6 +19,7 @@ import DateRangePicker from "./DateRangePicker.vue";
 import HistoryView from "./HistoryView.vue";
 import TodoItem from "./TodoItem.vue";
 import ConfirmDialog from "./ConfirmDialog.vue";
+import EmptyState from "./EmptyState.vue";
 import { useToast } from "../composables/useToast";
 
 const activeTab = ref<"editor" | "history">("editor");
@@ -46,6 +48,9 @@ async function loadConfig() {
       start.value = t.start;
       end.value = t.end;
     }
+    if (cfg.last_tab === "history" || cfg.last_tab === "editor") {
+      activeTab.value = cfg.last_tab;
+    }
   } catch (e) {
     console.error("加载配置失败", e);
     show("加载配置失败");
@@ -61,6 +66,7 @@ async function reload() {
       ...cfg,
       last_range_start: start.value,
       last_range_end: end.value,
+      last_tab: activeTab.value,
     });
   } catch (e) {
     console.error("加载待办列表失败", e);
@@ -69,6 +75,16 @@ async function reload() {
 }
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+async function switchTab(tab: "editor" | "history") {
+  activeTab.value = tab;
+  try {
+    const cfg = await apiGetConfig();
+    await apiSaveWindowConfig({ ...cfg, last_tab: tab });
+  } catch (e) {
+    console.error("保存 tab 状态失败", e);
+  }
+}
 
 function onRangeChange(s: string, e: string) {
   start.value = s;
@@ -97,6 +113,11 @@ async function onAdd() {
 
 function onKeyEnter() {
   onAdd();
+}
+
+function onTitlebarMouseDown(e: MouseEvent) {
+  if (e.button !== 0) return;
+  getCurrentWindow().startDragging().catch(() => {});
 }
 
 async function onToggle(todo: Todo, completed: boolean) {
@@ -147,7 +168,6 @@ async function doClearCompleted() {
 
 async function onCollapse() {
   try {
-    const { getCurrentWindow } = await import("@tauri-apps/api/window");
     const win = getCurrentWindow();
     const pos = await win.outerPosition();
     const size = await win.outerSize();
@@ -233,11 +253,7 @@ const dateStr = computed(() => {
     <!-- 标题栏 -->
     <header
       class="titlebar"
-      @mousedown="async (e) => {
-        if (e.button !== 0) return;
-        const { getCurrentWindow } = await import('@tauri-apps/api/window');
-        getCurrentWindow().startDragging().catch(() => {});
-      }"
+      @mousedown="onTitlebarMouseDown"
     >
       <div class="brand">
         <span class="logo">F</span>
@@ -278,13 +294,13 @@ const dateStr = computed(() => {
     <nav class="tab-bar">
       <button
         :class="{ active: activeTab === 'editor' }"
-        @click="activeTab = 'editor'"
+        @click="switchTab('editor')"
       >
         待办
       </button>
       <button
         :class="{ active: activeTab === 'history' }"
-        @click="activeTab = 'history'"
+        @click="switchTab('history')"
       >
         记录
       </button>
@@ -304,11 +320,7 @@ const dateStr = computed(() => {
 
     <!-- 列表 -->
     <div class="list" ref="listEl">
-      <div v-if="todos.length === 0" class="empty">
-        <div class="empty-mark">— § —</div>
-        <div class="empty-text">本日尚无安排</div>
-        <div class="empty-hint">在下方添加第一项</div>
-      </div>
+      <EmptyState v-if="todos.length === 0" text="本日尚无安排" hint="在下方添加第一项" />
       <ul v-else class="todo-list">
         <TodoItem
           v-for="(t, i) in todos"
@@ -339,8 +351,7 @@ const dateStr = computed(() => {
         placeholder="写下这一项……"
         @keydown.enter="onKeyEnter"
       />
-      <span class="composer-hint" v-if="!draft">↵</span>
-      <span class="composer-hint" v-else>↵</span>
+      <span class="composer-hint">↵</span>
     </footer>
     </template>
 
@@ -502,7 +513,6 @@ const dateStr = computed(() => {
 }
 .meta-item.count em {
   font-family: var(--font-display);
-  font-style: italic;
   font-weight: 600;
   font-size: 13px;
   color: var(--c-accent);
@@ -528,27 +538,6 @@ const dateStr = computed(() => {
 .empty {
   text-align: center;
   padding: 56px 24px 32px;
-}
-.empty-mark {
-  font-family: var(--font-display);
-  font-style: italic;
-  font-size: 18px;
-  color: var(--c-ink-dim);
-  letter-spacing: 0.1em;
-  margin-bottom: 16px;
-}
-.empty-text {
-  font-family: var(--font-display);
-  font-size: 18px;
-  color: var(--c-ink-soft);
-  margin-bottom: 6px;
-  letter-spacing: 0.02em;
-}
-.empty-hint {
-  font-size: 11px;
-  color: var(--c-ink-dim);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
 }
 
 /* —— 工具条 —— */

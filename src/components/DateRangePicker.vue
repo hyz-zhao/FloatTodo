@@ -59,8 +59,8 @@ function onCustomEnd(v: string) {
   emit("update", start, customEnd.value);
 }
 
-const startObj = computed(() => parseDate(props.start));
-const endObj = computed(() => parseDate(props.end));
+const startObj = computed(() => parseDate(props.start) ?? new Date());
+const endObj = computed(() => parseDate(props.end) ?? new Date());
 const sameDay = computed(() => props.start === props.end);
 const daySpan = computed(() => {
   const ms = endObj.value.getTime() - startObj.value.getTime();

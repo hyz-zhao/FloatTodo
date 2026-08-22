@@ -52,6 +52,8 @@ pub struct WindowConfig {
     pub last_range_start: String,
     /// 上次选中的日期范围结束
     pub last_range_end: String,
+    /// 上次激活的 tab
+    pub last_tab: String,
 }
 
 impl Default for WindowConfig {
@@ -65,6 +67,7 @@ impl Default for WindowConfig {
             panel_height: 520,
             last_range_start: String::new(),
             last_range_end: String::new(),
+            last_tab: String::from("editor"),
         }
     }
 }

@@ -68,9 +68,6 @@ fn save_config(cfg: &WindowConfig) -> Result<(), String> {
 
 /// 悬浮球的默认尺寸（逻辑像素，CSS 像素）
 const BALL_SIZE: f64 = 60.0;
-/// 主面板的默认尺寸（逻辑像素）
-const PANEL_DEFAULT_W: f64 = 360.0;
-const PANEL_DEFAULT_H: f64 = 520.0;
 
 /// 读取前端需要的浮窗配置
 #[tauri::command]
@@ -135,16 +132,8 @@ fn expand_to_panel(app: AppHandle) -> Result<(), String> {
     let ball_cx = pos.x as f64 + (size.width as f64) / 2.0 / scale;
     let ball_cy = pos.y as f64 + (size.height as f64) / 2.0 / scale;
 
-    let w = if cfg.panel_width == 0 {
-        PANEL_DEFAULT_W as u32
-    } else {
-        cfg.panel_width
-    };
-    let h = if cfg.panel_height == 0 {
-        PANEL_DEFAULT_H as u32
-    } else {
-        cfg.panel_height
-    };
+    let w = cfg.panel_width;
+    let h = cfg.panel_height;
 
     let new_physical = PhysicalSize::new(
         (w as f64 * scale).round() as u32,

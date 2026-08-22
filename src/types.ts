@@ -20,6 +20,7 @@ export interface WindowConfig {
   panel_height: number;
   last_range_start: string;
   last_range_end: string;
+  last_tab: string;
 }
 
 /** 快捷日期范围选项 */
